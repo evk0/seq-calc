@@ -1,0 +1,26 @@
+{
+  "name": "seq-calc",
+  "version": "0.1.0",
+  "description": "Sequent calculus for classical logic",
+  "main": "seq-calc.js",
+  "scripts": {
+    "test": "node seq-calc.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/evk0/seq-calc.git"
+  },
+  "keywords": [
+    "Sequent",
+    "calculus"
+  ],
+  "author": "Eugene Kochurov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/evk0/seq-calc/issues"
+  },
+  "homepage": "https://github.com/evk0/seq-calc#readme",
+  "devDependencies": {
+    "istanbul": "^0.4.5"
+  }
+}
