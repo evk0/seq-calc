@@ -1,10 +1,10 @@
 {
   "name": "seq-calc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Sequent calculus for classical logic",
   "main": "seq-calc.js",
   "scripts": {
-    "test": "node seq-calc.js"
+    "test": "istanbul cover _mocha -- -R spec"
   },
   "repository": {
     "type": "git",
@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/evk0/seq-calc#readme",
   "devDependencies": {
-    "istanbul": "^0.4.5"
+    "istanbul": "^0.4.5",
+    "mocha": "^3.2.0"
   }
 }

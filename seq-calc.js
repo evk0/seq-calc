@@ -4,17 +4,10 @@
   
   // https://www.dropbox.com/s/rre1xz4pzq074nh/orang2016.pdf?dl=0
 
-  var sentence = "(A && B => A || B) || __Cregserg_123 || !C";
-  function tokenize(str){
-    var arr = str.match(/(\w+|&&|\|\||=>|!|\(|\))/gi);
-    return arr;
-  }
-
-  //console.log(tokenize(sentence));
-
   function opPriority(op){
-    var p = {"!":10, "&&":20, "||":20, "=>":30};
-    return p[op]||100;
+    var p = {"-":10, "&":20, "|":20, "=>":30}[op];
+    if (!p) throw "Недопустимый оператор: "+op;
+    return p;
   }
 
   function ASTtoString(ast, priority=100){
@@ -22,32 +15,30 @@
       return ast;
     }
     var op = ast[0], pr = opPriority(op);
-    if (op=="!") return "!"+ASTtoString(ast[1], pr);
+    if (op=="-") return "-"+ASTtoString(ast[1], pr);
     var res = ast.slice(1).map(el => ASTtoString(el, pr)).join(op);
     if (priority <= pr) res = "("+res+")";
     return res;
   }
-  //console.log(ASTtoString("A"));
 
   // Правила вывода
-  // TODO: ASTtoString() можно не делать - все равно этот ключ по факту не используется
   var Rules = [
-    {spec: true, op: "&&", fn : (args) => {
+    {spec: true, op: "&", fn : (args) => {
       var alt = [];
       args.forEach(a => alt.push({spec: true, ast: a}));
       return [alt];
     }},
-    {spec: false, op: "&&", fn : (args) => {
+    {spec: false, op: "&", fn : (args) => {
       var res = [];
       args.forEach(a => res.push([{spec: false, ast: a}]));
       return res;  
     }},
-    {spec: true, op: "||", fn : (args) => {
+    {spec: true, op: "|", fn : (args) => {
       var res = [];
       args.forEach(a => res.push([{spec: true, ast: a}]));
       return res;
     }},
-    {spec: false, op: "||", fn : (args) => {
+    {spec: false, op: "|", fn : (args) => {
       var alt = [];
       args.forEach(a => alt.push({spec: false, ast: a}));
       return [alt];
@@ -58,10 +49,10 @@
     {spec: false, op: "=>", fn : ([a, b]) => {
       return [[{spec: true,  ast: a}, {spec: false, ast: b}]];
     }},
-    {spec: true, op: "!", fn : ([a]) => {
+    {spec: true, op: "-", fn : ([a]) => {
       return [[{spec: false, ast: a}]];
     }},
-    {spec: false, op: "!", fn : ([a]) => {
+    {spec: false, op: "-", fn : ([a]) => {
       return [[{spec: true, ast: a}]];
     }}
   ];
@@ -71,7 +62,6 @@
     var key = ruleKey(r.spec, r.op);
     RuleMap[key] = r.fn;
   });
-  //console.log(RuleMap);
  
   /* 
     Класс Sequence
@@ -89,7 +79,7 @@
   sProto.find = function(name){
     var seq = this;
     while (!seq._[name] && seq.parent) seq = seq.parent;
-    return this._[name];
+    return seq._[name];
   }
 
   // добавить с-формулу, если она не противоречит секвенции
@@ -113,14 +103,12 @@
       this.queue.push(alts);
       return true;
     }
-    //console.log(1, this._);
     // если разбиение формулы не приводит к сечению секвенции - добавим все подформулы к текущей секвенции
     var alt = alts[0];
     for (var i=0; i<alt.length; i++) {
       var res = this._add(alt[i]);
       if (!res) return false; // формула противоречит секвенции
     }
-    //console.log(2, this._);
     return true;
   };
 
@@ -128,7 +116,7 @@
   // К методу имеет смысл обращаться только у секвенций с пустой очередью
   sProto.getModel = function(){
     if (this.queue.length) throw "Модель секвенции не достроена. Выполните сечение секвенции: seq.cut()";
-    var astModel = ['&&'],
+    var astModel = ['&'],
         seq = this;
     // Пробегаем по всем родительским секвенциям
     while (seq){
@@ -137,11 +125,13 @@
         var sf = seq._[name];
         // Если формула атомарна - включаем ее в модель
         if (typeof sf.ast === 'string') {
-          astModel.push(sf.spec ? sf.ast : ['!', sf.ast]);
+          astModel.push(sf.spec ? sf.ast : ["-", sf.ast]);
         }
       }
       seq = seq.parent;
     }
+    //console.log(ASTtoString(astModel), astModel);
+    astModel.sort();
     return ASTtoString(astModel);
   };
 
@@ -173,18 +163,6 @@
 
   var ns = typeof window === 'undefined' ? module.exports : window;
   ns.Sequence = Sequence;
-
-  // Тесты
-
-  var ast = ["||", ["=>", ["&&", "A", "B"], ["||", "A", "B"]], "C", ["!", ["||", "A", "C"]]];
-  var str = ASTtoString(ast);
-
-  var seq = new Sequence();
-  seq.add({ spec: true, ast: ast });
-  console.log(str, 'Истинна при:', seq.cut());
-  
-  seq = new Sequence();
-  seq.add({ spec: false, ast: ast });
-  console.log(str, 'Ложна при:', seq.cut());
+  ns.ASTtoString = ASTtoString;
 
 }());
