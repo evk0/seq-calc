@@ -13,64 +13,42 @@ describe('basic', function() {
 describe('basic - tautologies', function() {
 	// Основные законы
 	driver.testTautology(["|",  A, ["-", A]]);
-	driver.testTautology(["=>", ["-", ["-", A]], A]);
-	driver.testTautology(["=>", A, ["-", ["-", A]]]);
+	driver.testTautology(["<=>", A, ["-", ["-", A]]]);
+	
 	driver.testTautology(["-", ["&",  A, ["-", A]]]);
-	driver.testTautology(["&", 
-		["=>", ["=>", A, B], ["|", ["-", A], B]], 
-		["=>", ["|", ["-", A], B], ["=>", A, B]]
-	]);
+	driver.testTautology(["<=>", ["=>", A, B], ["|", ["-", A], B]]);
+	driver.testTautology(["<=>", ["<=>", A, B], ["&", ["=>", A, B], ["=>", B, A]]]);
 	
 	// Законы де Мограна
-	driver.testTautology(["&", 
-		["=>", ["-", ["&", A, B]], ["|", ["-", A], ["-", B]]],
-		["=>", ["|", ["-", A], ["-", B]], ["-", ["&", A, B]]]
-	]);
-	driver.testTautology(["&", 
-		["=>", ["-", ["|", A, B]], ["&", ["-", A], ["-", B]]],
-		["=>", ["&", ["-", A], ["-", B]], ["-", ["|", A, B]]]
-	]);
+	driver.testTautology(["<=>", ["-", ["&", A, B]], ["|", ["-", A], ["-", B]]]);
+	driver.testTautology(["<=>", ["-", ["|", A, B]], ["&", ["-", A], ["-", B]]]);
 	
 	// Коммутативность
-	driver.testTautology(["=>", ["|", A, B], ["|", B, A]]);
-	driver.testTautology(["=>", ["&", A, B], ["&", B, A]]);
+	driver.testTautology(["<=>", ["|", A, B], ["|", B, A]]);
+	driver.testTautology(["<=>", ["&", A, B], ["&", B, A]]);
+	driver.testTautology(["<=>", ["<=>", A, B], ["<=>", B, A]]);
 	
 	// Ассоциативность
-	driver.testTautology(["&", 
-		["=>", ["|", A, ["|", B, C]], ["|", ["|", A, B], C]],
-		["=>", ["|", ["|", A, B], C], ["|", A, ["|", B, C]]]
-	]);
-	driver.testTautology(["&", 
-		["=>", ["&", A, ["&", B, C]], ["&", ["&", A, B], C]],
-		["=>", ["&", ["&", A, B], C], ["&", A, ["&", B, C]]]
-	]);
+	driver.testTautology(["<=>", ["|", A, ["|", B, C]], ["|", ["|", A, B], C]]);
+	driver.testTautology(["<=>", ["&", A, ["&", B, C]], ["&", ["&", A, B], C]]);
 	// Поглощение
-	driver.testTautology(["&", 
-		["=>", ["|", A, ["&", A, B]], A],
-		["=>", A, ["|", A, ["&", A, B]]]
-	]);
-	driver.testTautology(["&", 
-		["=>", ["&", A, ["|", A, B]], A],
-		["=>", A, ["&", A, ["|", A, B]]]
-	]);
+	driver.testTautology(["<=>", ["|", A, ["&", A, B]], A]);
+	driver.testTautology(["<=>", ["&", A, ["|", A, B]], A]);
 	// Контрапозиция
-	driver.testTautology(["&", 
-		["=>", ["=>", A, B], ["=>", ["-", B] , ["-", A]]],
-		["=>", ["=>", ["-", B] , ["-", A]], ["=>", A, B]]
-	]);
+	driver.testTautology(["<=>", ["=>", A, B], ["=>", ["-", B] , ["-", A]]]);
 });
 
 describe('basic - corner cases', function() {
 	it('Недопустимый оператор в выражении', function() {
 		assert.throws(() => {
-			ASTtoString(['!', A]);
+			ASTtoString(['*', A]);
 		});
 	});
 	it('Нельзя добавлять формулы в закрытую секвенцию', function() {
 		assert.throws(() => {
 			var seq = new Sequence();
 			seq.add({ spec: true, ast: A });
-			seq.add({ spec: true, ast: ["-", A] });
+			seq.add({ spec: false, ast: A });
 			seq.add({ spec: true, ast: B });
 		});
 	});
@@ -88,5 +66,26 @@ describe('basic - corner cases', function() {
 		var child = new Sequence(Th);
 		child.add({ spec: true, ast: ["=>", A, ["-", B]] });
 		assert.equal(child.cut(), '-B&A');
+	});
+});
+
+describe('basic - relevance', function() {
+	it('(B|A)&(-B|C)', function() {
+		Sequence.DEBUG = true;
+		var seq = new Sequence();
+		seq.add({ spec: true, ast: A });
+		seq.add({ spec: true, ast: ["|", B, A] });
+		seq.add({ spec: true, ast: ["|", ["-", B], C] });
+		assert.equal(seq.cut(), 'A&B&C');
+		Sequence.DEBUG = false;
+	});
+	it('(-B|C)&(B|A)', function() {
+		Sequence.DEBUG = true;
+		var seq = new Sequence();
+		seq.add({ spec: true, ast: A });
+		seq.add({ spec: true, ast: ["|", ["-", B], C] });
+		seq.add({ spec: true, ast: ["|", B, A] });
+		assert.equal(seq.cut(), 'A&B&C');
+		Sequence.DEBUG = false;
 	});
 });

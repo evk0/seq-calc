@@ -4,8 +4,9 @@
   
   // https://www.dropbox.com/s/rre1xz4pzq074nh/orang2016.pdf?dl=0
 
+  // Приоритеты используются, чтобы опускать скобки, не влияющие на порядок вычисления
   function opPriority(op){
-    var p = {"-":10, "&":20, "|":20, "=>":30}[op];
+    var p = {"-":10, "&":20, "|":20, "=>":30, "<=>":30}[op];
     if (!p) throw "Недопустимый оператор: "+op;
     return p;
   }
@@ -19,6 +20,13 @@
     var res = ast.slice(1).map(el => ASTtoString(el, pr)).join(op);
     if (priority <= pr) res = "("+res+")";
     return res;
+  }
+  function ASTExtractAtoms(ast, map={}){
+    if (Array.isArray(ast)){
+      ast.slice(1).forEach(el => ASTExtractAtoms(el, map));
+    } else {
+      map[ast] = true;
+    }
   }
 
   // Правила вывода
@@ -48,6 +56,18 @@
     }},
     {spec: false, op: "=>", fn : ([a, b]) => {
       return [[{spec: true,  ast: a}, {spec: false, ast: b}]];
+    }},
+    {spec: true, op: "<=>", fn : ([a, b]) => {
+      return [
+        [{spec: true,  ast: a}, {spec: true,  ast: b}],
+        [{spec: false, ast: a}, {spec: false, ast: b}]
+      ];
+    }},
+    {spec: false, op: "<=>", fn : ([a, b]) => {
+      return [
+        [{spec: false, ast: a}, {spec: true,  ast: b}],
+        [{spec: true,  ast: a}, {spec: false, ast: b}]
+      ];
     }},
     {spec: true, op: "-", fn : ([a]) => {
       return [[{spec: false, ast: a}]];
@@ -92,15 +112,30 @@
     var name = ASTtoString(sf.ast);
     // Поищем с-формулу в секвенции и проверим, не противоречит ли она
     var existSf = this.find(name);
-    if (existSf && existSf.spec !== sf.spec) return false;
+    if (existSf) { 
+      return existSf.spec === sf.spec;
+    }
+    // Добавляем формулу
     this._[name] = sf;
+    /* TODO: здесь лезть в сечения нельзя, т.к. часть из них унаследовано от родительской секвенции
+    // Обновим релевантность сечений
+    // TODO: надо или обновлять релевантность только для атомов, или в картах сечений держать все подформулы (а не только атомы)
+    this.queue.forEach(cut => {
+      if (cut.map[name]) cut.rel++;
+    });
+    */
     // Применим к с-формуле соответствующее правило вывода
     var rule = RuleMap[ruleKey(sf.spec, sf.ast[0])];
     if (!rule) return true; // нет правила - с-формула полностью разобрана
     var alts = rule(sf.ast.slice(1));
     if (alts.length>1) {
       // Разбор с-формулы требует сечения секвенции
-      this.queue.push(alts);
+      var map = {};
+      // Составим карту атомов сечения
+      alts.forEach(alt => alt.forEach(sf => ASTExtractAtoms(sf.ast, map)));
+      // var rel = Object.keys(map).filter(name => this.find(name)).length;
+      // Добавляем сечение
+      this.queue.push({ alts, map });
       return true;
     }
     // если разбиение формулы не приводит к сечению секвенции - добавим все подформулы к текущей секвенции
@@ -130,7 +165,6 @@
       }
       seq = seq.parent;
     }
-    //console.log(ASTtoString(astModel), astModel);
     astModel.sort();
     return ASTtoString(astModel);
   };
@@ -141,19 +175,31 @@
     if (!this.queue.length) return this.getModel(); // нет сечений в очереди - модель готова
     
     var childQueue = this.queue.slice();
-    var alts = childQueue.pop();
+    // Выбираем самое релевантное сечение: в котором наименьшее число еще неопределенных атомов
+    var minRel = Infinity, minRelIndex = 0;
+    for (var i = 0; i < childQueue.length; i++) {
+      var rel = Object.keys(childQueue[i].map).filter(name => !this.find(name)).length;
+      if (rel <= minRel) { // При прочих равных берем последнюю
+        minRel = rel;
+        minRelIndex = i;
+      }
+    }
+    if (Sequence.DEBUG) {
+      this.childs = [];
+    }
+    var alts = childQueue.splice(minRelIndex, 1)[0].alts; // childQueue.pop().alts; // 
     for (var i=0; i<alts.length; i++) {
       var alt = alts[i];
-      // В каждом сечении всегда добавляется только одна новая формула
       var seq = new Sequence(this, childQueue.slice());
-      var sf = alt[0];
-      var isOpened = seq.add(sf);
-      if (isOpened) {
+      if (Sequence.DEBUG) {
+        this.childs.push(seq);
+      }
+      // В каждом сечении добавляем формулы из текущей рассматриваемой альтернативы
+      alt.forEach(sf => seq.isOpen && seq.add(sf));
+      if (seq.isOpen) {
         var res = seq.cut();
         // Если не возникло противоречие после сечения дочерней секвенции - модель готова
-        if (res) {
-          return res;
-        }
+        if (res) return res;
       }
     }
     // Если ни одно сечение не дало модели - секвенция закрывается
