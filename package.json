@@ -1,6 +1,6 @@
 {
   "name": "seq-calc",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "description": "Sequent calculus for classical logic",
   "main": "seq-calc.js",
   "scripts": {
